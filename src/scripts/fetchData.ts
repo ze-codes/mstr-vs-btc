@@ -3,8 +3,10 @@ import path from "path";
 import { BTCPriceData, MarketCapData } from "@/types";
 import * as dotenv from "dotenv";
 
-// Load environment variables from .env file
-dotenv.config();
+// Load environment variables from .env file only in development
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config();
+}
 
 interface CryptoCompareResponse {
   Response: string;
@@ -88,9 +90,15 @@ async function fetchData() {
 
     // Fetch market cap data
     console.log("\nFetching MSTR market cap data...");
+
+    // Get API key from environment variables
     const API_KEY = process.env.FMP_API_KEY;
+    console.log("API Key available:", !!API_KEY); // Debug log
+
     if (!API_KEY) {
-      throw new Error("FMP_API_KEY not found in environment variables");
+      throw new Error(
+        "FMP_API_KEY not found in environment variables. Make sure it's set in .env file or GitHub secrets."
+      );
     }
 
     const mstrResponse = await fetch(
@@ -121,9 +129,13 @@ async function fetchData() {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
+    // Create data directory if it doesn't exist
+    const dataDir = path.join(process.cwd(), "src/data");
+    await fs.mkdir(dataDir, { recursive: true });
+
     // Save both datasets
-    const btcFilePath = path.join(process.cwd(), "src/data/btcPrices.json");
-    const mstrFilePath = path.join(process.cwd(), "src/data/marketCap.json");
+    const btcFilePath = path.join(dataDir, "btcPrices.json");
+    const mstrFilePath = path.join(dataDir, "marketCap.json");
 
     await Promise.all([
       fs.writeFile(btcFilePath, JSON.stringify(formattedBTCData, null, 2)),
