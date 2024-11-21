@@ -1,101 +1,406 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef } from "react";
+import * as d3 from "d3";
+import { BTCPurchase, MarketCapData, BTCPriceData } from "@/types";
+import { btcPurchases } from "@/data/btcPurchases";
+import btcPrices from "@/data/btcPrices.json";
+import marketCapData from "@/data/marketCap.json";
+import Link from "next/link";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const svgRef = useRef<SVGSVGElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    const fetchAndRenderData = async () => {
+      try {
+        // Create a map of dates to BTC prices for easy lookup
+        const btcPriceMap = new Map(
+          btcPrices.map((item: BTCPriceData) => [item.date, item.price])
+        );
+
+        // Combine market cap data with BTC holdings value
+        const chartData = marketCapData.map((mcData: MarketCapData) => {
+          const date = new Date(mcData.date);
+          const btcPrice = btcPriceMap.get(mcData.date) || 0;
+          const btcValue =
+            calculateBTCValueAtDate(date, btcPurchases) * btcPrice;
+
+          return {
+            date: date,
+            marketCap: mcData.marketCap,
+            btcHoldingsValue: btcValue,
+          };
+        });
+
+        renderChart(chartData);
+      } catch (error) {
+        console.error("Failed to process data:", error);
+      }
+    };
+
+    fetchAndRenderData();
+  }, []);
+
+  const renderChart = (
+    data: { date: Date; marketCap: number; btcHoldingsValue: number }[]
+  ) => {
+    if (!svgRef.current) return;
+
+    // Clear previous chart
+    d3.select(svgRef.current).selectAll("*").remove();
+
+    // Set dimensions
+    const margin = { top: 50, right: 70, bottom: 50, left: 70 };
+    const width = svgRef.current.clientWidth - margin.left - margin.right;
+    const height = svgRef.current.clientHeight - margin.top - margin.bottom;
+
+    // Create clip path
+    const svg = d3
+      .select(svgRef.current)
+      .append("defs")
+      .append("clipPath")
+      .attr("id", "clip")
+      .append("rect")
+      .attr("width", width)
+      .attr("height", height);
+
+    // Create main chart group
+    const g = d3
+      .select(svgRef.current)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // Calculate ratio data
+    const dataWithRatio = data.map((d) => ({
+      ...d,
+      ratio: ((d.marketCap - d.btcHoldingsValue) / d.btcHoldingsValue) * 100,
+    }));
+
+    // Set scales
+    const xScale = d3
+      .scaleTime()
+      .domain(d3.extent(data, (d) => d.date) as [Date, Date])
+      .range([0, width]);
+
+    const yScale = d3
+      .scaleLinear()
+      .domain([
+        0,
+        d3.max(data, (d) =>
+          Math.max(d.marketCap, d.btcHoldingsValue)
+        ) as number,
+      ])
+      .range([height, 0]);
+
+    const maxDeviation = d3.max(dataWithRatio, (d) =>
+      Math.abs(d.ratio)
+    ) as number;
+    const yScaleRight = d3
+      .scaleLinear()
+      .domain([-maxDeviation, maxDeviation])
+      .range([height, 0]);
+
+    // Create a group for the clipped content
+    const chartContent = g.append("g").attr("clip-path", "url(#clip)");
+
+    // Create lines
+    const marketCapLine = d3
+      .line<(typeof data)[0]>()
+      .x((d) => xScale(d.date))
+      .y((d) => yScale(d.marketCap));
+
+    const btcLine = d3
+      .line<(typeof data)[0]>()
+      .x((d) => xScale(d.date))
+      .y((d) => yScale(d.btcHoldingsValue));
+
+    const ratioLine = d3
+      .line<(typeof dataWithRatio)[0]>()
+      .x((d) => xScale(d.date))
+      .y((d) => yScaleRight(d.ratio));
+
+    // Add lines to the clipped group
+    chartContent
+      .append("path")
+      .datum(data)
+      .attr("class", "market-cap-line")
+      .attr("fill", "none")
+      .attr("stroke", "#8884d8")
+      .attr("stroke-width", 2)
+      .attr("d", marketCapLine);
+
+    chartContent
+      .append("path")
+      .datum(data)
+      .attr("class", "btc-line")
+      .attr("fill", "none")
+      .attr("stroke", "#82ca9d")
+      .attr("stroke-width", 2)
+      .attr("d", btcLine);
+
+    chartContent
+      .append("path")
+      .datum(dataWithRatio)
+      .attr("class", "ratio-line")
+      .attr("fill", "none")
+      .attr("stroke", "#ff7f0e")
+      .attr("stroke-width", 2)
+      .attr("d", ratioLine);
+
+    // Create axes groups
+    const xAxisGroup = g
+      .append("g")
+      .attr("class", "x-axis")
+      .attr("transform", `translate(0,${height})`);
+
+    const yAxisGroup = g.append("g").attr("class", "y-axis");
+
+    const yAxisRightGroup = g
+      .append("g")
+      .attr("class", "y-axis-right")
+      .attr("transform", `translate(${width},0)`);
+
+    // Create axes
+    const xAxis = d3.axisBottom(xScale);
+    const yAxis = d3
+      .axisLeft(yScale)
+      .tickFormat((d) => `$${(+d / 1e9).toFixed(1)}B`);
+    const yAxisRight = d3
+      .axisRight(yScaleRight)
+      .tickFormat((d) => `${(+d).toFixed(0)}%`);
+
+    // Add axes
+    xAxisGroup.call(xAxis);
+    yAxisGroup.call(yAxis);
+    yAxisRightGroup.call(yAxisRight);
+
+    // Add zero line
+    chartContent
+      .append("line")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", yScaleRight(0))
+      .attr("y2", yScaleRight(0))
+      .attr("stroke", "#666")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "4,4")
+      .attr("opacity", 0.5);
+
+    // Create zoom behavior
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([1, 20]) // Min and max zoom level
+      .extent([
+        [0, 0],
+        [width, height],
+      ])
+      .translateExtent([
+        [0, -Infinity],
+        [width, Infinity],
+      ])
+      .on("zoom", zoomed);
+
+    // Add zoom behavior to SVG
+    d3.select(svgRef.current).call(zoom);
+
+    // Zoom function
+    function zoomed(event: d3.D3ZoomEvent<SVGSVGElement, unknown>) {
+      const newXScale = event.transform.rescaleX(xScale);
+
+      // Update lines
+      chartContent.select(".market-cap-line").attr(
+        "d",
+        marketCapLine.x((d) => newXScale(d.date))
+      );
+
+      chartContent.select(".btc-line").attr(
+        "d",
+        btcLine.x((d) => newXScale(d.date))
+      );
+
+      chartContent.select(".ratio-line").attr(
+        "d",
+        ratioLine.x((d) => newXScale(d.date))
+      );
+
+      // Update x-axis
+      xAxisGroup.call(xAxis.scale(newXScale));
+    }
+
+    // Add legend
+    const legend = g
+      .append("g")
+      .attr("font-family", "sans-serif")
+      .attr("font-size", 12)
+      .attr("text-anchor", "start")
+      .selectAll("g")
+      .data([
+        { color: "#8884d8", label: "MSTR Market Cap" },
+        { color: "#82ca9d", label: "BTC Holdings Value" },
+        { color: "#ff7f0e", label: "Market Cap Premium/Discount to BTC" },
+      ])
+      .join("g")
+      .attr("transform", (d, i) => `translate(${i * 250}, ${height + 40})`);
+
+    legend
+      .append("rect")
+      .attr("x", 0)
+      .attr("width", 19)
+      .attr("height", 19)
+      .attr("fill", (d) => d.color);
+
+    legend
+      .append("text")
+      .attr("x", 24)
+      .attr("y", 9.5)
+      .attr("dy", "0.32em")
+      .text((d) => d.label);
+
+    // Add y-axis labels
+    g.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -margin.left)
+      .attr("x", -height / 2)
+      .attr("dy", "1em")
+      .style("text-anchor", "middle")
+      .text("Value (USD)");
+
+    g.append("text")
+      .attr("transform", "rotate(90)")
+      .attr("y", -width - margin.right)
+      .attr("x", height / 2)
+      .attr("dy", "1em")
+      .style("text-anchor", "middle")
+      .text("Premium/Discount to BTC Holdings (%)");
+
+    // Create tooltip div
+    const tooltip = d3
+      .select("body")
+      .append("div")
+      .attr(
+        "class",
+        "absolute hidden bg-black/80 text-white p-2 rounded text-sm pointer-events-none whitespace-nowrap"
+      )
+      .style("z-index", "100");
+
+    // Create a vertical line for hover effect
+    const verticalLine = g
+      .append("line")
+      .attr("class", "vertical-line")
+      .attr("y1", 0)
+      .attr("y2", height)
+      .attr("stroke", "#666")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "4,4")
+      .style("opacity", 0);
+
+    // Create overlay for mouse events
+    const mouseG = g
+      .append("rect")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "none")
+      .attr("pointer-events", "all");
+
+    // Mouse move handler
+    mouseG.on("mousemove", function (event) {
+      const [mouseX] = d3.pointer(event);
+      const xDate = xScale.invert(mouseX);
+
+      // Find the closest data point
+      const bisect = d3.bisector((d: any) => d.date).left;
+      const index = bisect(data, xDate);
+      const d = data[index];
+
+      if (d) {
+        // Update vertical line position
+        verticalLine
+          .attr("x1", xScale(d.date))
+          .attr("x2", xScale(d.date))
+          .style("opacity", 1);
+
+        // Calculate ratio
+        const ratio =
+          ((d.marketCap - d.btcHoldingsValue) / d.btcHoldingsValue) * 100;
+
+        // Format date
+        const formattedDate = d.date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+
+        // Update tooltip content and position
+        tooltip
+          .html(
+            `<div class="space-y-1">
+              <div class="font-bold">${formattedDate}</div>
+              <div>MSTR Market Cap: $${(d.marketCap / 1e9).toFixed(2)}B</div>
+              <div>BTC Holdings: $${(d.btcHoldingsValue / 1e9).toFixed(
+                2
+              )}B</div>
+              <div>Premium/Discount: ${ratio.toFixed(1)}%</div>
+            </div>`
+          )
+          .style("left", `${event.pageX + 15}px`)
+          .style("top", `${event.pageY - 15}px`)
+          .style("display", "block");
+      }
+    });
+
+    // Mouse leave handler
+    mouseG.on("mouseleave", function () {
+      verticalLine.style("opacity", 0);
+      tooltip.style("display", "none");
+    });
+  };
+
+  return (
+    <div className="min-h-screen p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Updated navigation button */}
+        <Link
+          href={
+            process.env.NODE_ENV === "production"
+              ? "/"
+              : "https://github.com/ze-codes/mstr-vs-btc"
+          }
+          className="inline-block mb-8 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          target={process.env.NODE_ENV === "production" ? "_self" : "_blank"}
+          rel={
+            process.env.NODE_ENV === "production" ? "" : "noopener noreferrer"
+          }
+        >
+          {process.env.NODE_ENV === "production"
+            ? "← Back to Main Page"
+            : "View on GitHub"}
+        </Link>
+
+        <h1 className="text-2xl font-bold mb-8">
+          MicroStrategy: Market Cap vs BTC Holdings Value
+        </h1>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+          <div className="text-sm text-gray-500 mb-2">
+            Use mouse wheel to zoom, drag to pan
+          </div>
+          <svg
+            ref={svgRef}
+            className="w-full h-[600px]"
+            style={{ overflow: "visible", marginBottom: "40px" }}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
+}
+
+function calculateBTCValueAtDate(date: Date, purchases: BTCPurchase[]): number {
+  let totalBTC = 0;
+  for (const purchase of purchases) {
+    if (new Date(purchase.date) <= date) {
+      totalBTC += purchase.amount;
+    }
+  }
+  return totalBTC;
 }

@@ -1,0 +1,50 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Deploy on push to main branch
+  push:
+    branches:
+      - main
+  # Run every day at 00:00 UTC
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed for pushing updates
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch data
+        run: npm run fetch-data
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+
+      - name: Commit updated data
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add src/data/btcPrices.json src/data/marketCap.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update price data [skip ci]" && git push)
+
+      - name: Build
+        run: npm run build
+
+      - name: Add .nojekyll file
+        run: touch out/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: out
+          branch: gh-pages

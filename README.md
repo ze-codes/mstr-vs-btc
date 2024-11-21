@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MicroStrategy vs BTC Holdings Value
 
-## Getting Started
+This project visualizes the relationship between MicroStrategy's market capitalization and the value of its Bitcoin holdings. It shows:
 
-First, run the development server:
+- MSTR's market capitalization over time
+- The value of MSTR's BTC holdings
+- The premium/discount ratio between market cap and BTC holdings
+
+## Features
+
+- Interactive D3.js chart with zoom and pan capabilities
+- Daily data updates via GitHub Actions
+- Hover tooltips with detailed information
+- Dark mode support
+- Responsive design
+
+## Data Sources
+
+- Bitcoin price data from CryptoCompare API
+- Market capitalization data from Financial Modeling Prep API
+- BTC holdings data from MicroStrategy's public disclosures
+
+## Development
+
+To run this project locally:
 
 ```bash
+# Install dependencies
+npm install
+# Fetch latest data
+npm run fetch-data
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit `http://localhost:3000` to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The project is automatically deployed to GitHub Pages:
 
-## Learn More
+- On every push to the main branch
+- Daily at 00:00 UTC to update price data
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Required environment variables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `FMP_API_KEY`: Financial Modeling Prep API key
 
-## Deploy on Vercel
+## Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Next.js
+- D3.js
+- TypeScript
+- Tailwind CSS
+- GitHub Actions
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
