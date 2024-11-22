@@ -381,23 +381,25 @@ export default function Home() {
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Updated navigation button */}
-        <Link
-          href={
-            process.env.NODE_ENV === "production"
-              ? "/"
-              : "https://github.com/ze-codes/mstr-vs-btc"
-          }
-          className="inline-block mb-8 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          target={process.env.NODE_ENV === "production" ? "_self" : "_blank"}
-          rel={
-            process.env.NODE_ENV === "production" ? "" : "noopener noreferrer"
-          }
-        >
-          {process.env.NODE_ENV === "production"
-            ? "← Back to Main Page"
-            : "View on GitHub"}
-        </Link>
+        {/* Updated navigation buttons */}
+        <div className="flex gap-4 mb-8">
+          <a
+            href="https://ze-codes.github.io/"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Back to Main Page
+          </a>
+          <a
+            href="https://github.com/ze-codes/mstr-vs-btc"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View on GitHub
+          </a>
+        </div>
 
         <h1 className="text-2xl font-bold mb-8">
           MicroStrategy: Market Cap vs BTC Holdings Value
