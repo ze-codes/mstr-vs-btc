@@ -3,10 +3,21 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { BTCPurchase, MarketCapData, BTCPriceData } from "@/types";
-import { btcPurchases } from "@/data/btcPurchases";
 import btcPrices from "@/data/btcPrices.json";
 import marketCapData from "@/data/marketCap.json";
+import { btcPurchases } from "@/data/btcPurchases";
 import Link from "next/link";
+
+// Define interfaces at the top level
+interface DataPoint {
+  date: Date;
+  marketCap: number;
+  btcHoldingsValue: number;
+}
+
+interface DataPointWithRatio extends DataPoint {
+  ratio: number;
+}
 
 export default function Home() {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -56,6 +67,7 @@ export default function Home() {
     const height = svgRef.current.clientHeight - margin.top - margin.bottom;
 
     // Create clip path
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const svg = d3
       .select(svgRef.current)
       .append("defs")
@@ -208,20 +220,29 @@ export default function Home() {
     function zoomed(event: d3.D3ZoomEvent<SVGSVGElement, unknown>) {
       const newXScale = event.transform.rescaleX(xScale);
 
-      // Update lines
+      // Update lines with new scale
       chartContent.select(".market-cap-line").attr(
         "d",
-        marketCapLine.x((d) => newXScale(d.date))
+        d3
+          .line<DataPoint>()
+          .x((d) => newXScale(d.date))
+          .y((d) => yScale(d.marketCap))(data)
       );
 
       chartContent.select(".btc-line").attr(
         "d",
-        btcLine.x((d) => newXScale(d.date))
+        d3
+          .line<DataPoint>()
+          .x((d) => newXScale(d.date))
+          .y((d) => yScale(d.btcHoldingsValue))(data)
       );
 
       chartContent.select(".ratio-line").attr(
         "d",
-        ratioLine.x((d) => newXScale(d.date))
+        d3
+          .line<DataPointWithRatio>()
+          .x((d) => newXScale(d.date))
+          .y((d) => yScaleRight(d.ratio))(dataWithRatio)
       );
 
       // Update x-axis
@@ -309,6 +330,7 @@ export default function Home() {
       const xDate = xScale.invert(mouseX);
 
       // Find the closest data point
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bisect = d3.bisector((d: any) => d.date).left;
       const index = bisect(data, xDate);
       const d = data[index];
