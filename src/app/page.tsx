@@ -6,7 +6,6 @@ import { BTCPurchase, MarketCapData, BTCPriceData } from "@/types";
 import btcPrices from "@/data/btcPrices.json";
 import marketCapData from "@/data/marketCap.json";
 import { btcPurchases } from "@/data/btcPurchases";
-import Link from "next/link";
 
 // Define interfaces at the top level
 interface DataPoint {
