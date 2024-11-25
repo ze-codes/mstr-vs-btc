@@ -3,6 +3,12 @@ import { BTCPurchase } from "@/types";
 // This is your BTC purchase data from the image
 export const btcPurchases: BTCPurchase[] = [
   {
+    date: "2024-11-25",
+    averagePrice: 97862.0,
+    amount: 55500,
+    cost: 5400000000.0,
+  },
+  {
     date: "2024-11-18",
     averagePrice: 88627.0,
     amount: 51780,
