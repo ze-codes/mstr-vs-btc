@@ -201,7 +201,7 @@ export default function Home() {
     // Create zoom behavior
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 20]) // Min and max zoom level
+      .scaleExtent([1, 500]) // Min and max zoom level
       .extent([
         [0, 0],
         [width, height],
@@ -215,9 +215,13 @@ export default function Home() {
     // Add zoom behavior to SVG
     d3.select(svgRef.current).call(zoom);
 
+    // Add a ref to store current transform
+    let currentTransform = d3.zoomIdentity;
+
     // Zoom function
     function zoomed(event: d3.D3ZoomEvent<SVGSVGElement, unknown>) {
       const newXScale = event.transform.rescaleX(xScale);
+      currentTransform = event.transform; // Store current transform
 
       // Update lines with new scale
       chartContent.select(".market-cap-line").attr(
@@ -326,19 +330,33 @@ export default function Home() {
     // Mouse move handler
     mouseG.on("mousemove", function (event) {
       const [mouseX] = d3.pointer(event);
-      const xDate = xScale.invert(mouseX);
+      // Use the transformed scale for date lookup
+      const xDate = currentTransform.rescaleX(xScale).invert(mouseX);
 
       // Find the closest data point
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bisect = d3.bisector((d: any) => d.date).left;
       const index = bisect(data, xDate);
-      const d = data[index];
+
+      // Handle edge cases
+      if (index >= data.length) return;
+
+      // Find the closest point by comparing the current and next point
+      const currentPoint = data[index];
+      const previousPoint = index > 0 ? data[index - 1] : currentPoint;
+
+      // Determine which point is closer to the mouse
+      const d =
+        xDate.getTime() - previousPoint.date.getTime() >
+        currentPoint.date.getTime() - xDate.getTime()
+          ? currentPoint
+          : previousPoint;
 
       if (d) {
-        // Update vertical line position
+        // Update vertical line position using transformed scale
         verticalLine
-          .attr("x1", xScale(d.date))
-          .attr("x2", xScale(d.date))
+          .attr("x1", currentTransform.rescaleX(xScale)(d.date))
+          .attr("x2", currentTransform.rescaleX(xScale)(d.date))
           .style("opacity", 1);
 
         // Calculate ratio
