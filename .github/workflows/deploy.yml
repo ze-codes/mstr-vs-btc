@@ -28,8 +28,6 @@ jobs:
 
       - name: Fetch data
         run: npm run fetch-data
-        env:
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
 
       - name: Commit updated data
         run: |

@@ -1,12 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import { BTCPriceData, MarketCapData } from "@/types";
-import * as dotenv from "dotenv";
-
-// Load environment variables from .env file only in development
-if (process.env.NODE_ENV !== "production") {
-  dotenv.config();
-}
 
 interface CryptoCompareResponse {
   Response: string;
@@ -28,10 +22,21 @@ interface CryptoCompareResponse {
   };
 }
 
-interface FMPResponse {
-  symbol: string;
-  date: string;
-  marketCap: number;
+interface YahooChartResponse {
+  chart: {
+    result: Array<{
+      timestamp: number[];
+      indicators: {
+        quote: Array<{
+          close: (number | null)[];
+        }>;
+        adjclose?: Array<{
+          adjclose: (number | null)[];
+        }>;
+      };
+    }>;
+    error: null | { code: string; description: string };
+  };
 }
 
 async function fetchData() {
@@ -88,41 +93,60 @@ async function fetchData() {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Fetch market cap data
-    console.log("\nFetching MSTR market cap data...");
+    // Fetch MSTR market cap data using Yahoo Finance
+    console.log("\nFetching MSTR market cap data from Yahoo Finance...");
 
-    // Get API key from environment variables
-    const API_KEY = process.env.FMP_API_KEY;
-    console.log("API Key available:", !!API_KEY); // Debug log
+    const period1 = Math.floor(startDate.getTime() / 1000);
+    const period2 = Math.floor(today.getTime() / 1000);
 
-    if (!API_KEY) {
-      throw new Error(
-        "FMP_API_KEY not found in environment variables. Make sure it's set in .env file or GitHub secrets."
-      );
-    }
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/MSTR?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false`;
 
-    const mstrResponse = await fetch(
-      `https://financialmodelingprep.com/api/v3/historical-market-capitalization/MSTR?` +
-        `from=${
-          startDate.toISOString().split("T")[0]
-        }&to=${toDate}&apikey=${API_KEY}`
-    );
+    const mstrResponse = await fetch(yahooUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
 
     if (!mstrResponse.ok) {
       throw new Error(`MSTR HTTP error! status: ${mstrResponse.status}`);
     }
 
-    const mstrData: FMPResponse[] = await mstrResponse.json();
+    const yahooData: YahooChartResponse = await mstrResponse.json();
 
-    if (!Array.isArray(mstrData) || mstrData.length === 0) {
-      throw new Error("Invalid or empty MSTR response from API");
+    if (yahooData.chart.error) {
+      throw new Error(
+        `Yahoo Finance API error: ${yahooData.chart.error.description}`
+      );
     }
 
+    const result = yahooData.chart.result[0];
+    if (!result || !result.timestamp || !result.indicators.quote[0]) {
+      throw new Error("Invalid or empty MSTR response from Yahoo Finance");
+    }
+
+    const timestamps = result.timestamp;
+    const closes =
+      result.indicators.adjclose?.[0]?.adjclose ||
+      result.indicators.quote[0].close;
+
+    // MSTR shares outstanding (approximate, updated periodically)
+    // As of late 2024, MSTR has approximately 244 million shares outstanding
+    // This is an approximation - actual historical market caps would vary due to stock issuance
+    const SHARES_OUTSTANDING = 244_000_000;
+
     // Format market cap data
-    const formattedMSTRData: MarketCapData[] = mstrData.map((item) => ({
-      date: item.date,
-      marketCap: item.marketCap,
-    }));
+    const formattedMSTRData: MarketCapData[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const price = closes[i];
+      if (price !== null && price !== undefined) {
+        const date = new Date(timestamps[i] * 1000).toISOString().split("T")[0];
+        formattedMSTRData.push({
+          date,
+          marketCap: Math.round(price * SHARES_OUTSTANDING),
+        });
+      }
+    }
 
     // Sort market cap data
     formattedMSTRData.sort(

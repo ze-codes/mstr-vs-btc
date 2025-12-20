@@ -61,7 +61,7 @@ export default function Home() {
     d3.select(svgRef.current).selectAll("*").remove();
 
     // Set dimensions
-    const margin = { top: 50, right: 70, bottom: 50, left: 70 };
+    const margin = { top: 20, right: 80, bottom: 80, left: 80 };
     const width = svgRef.current.clientWidth - margin.left - margin.right;
     const height = svgRef.current.clientHeight - margin.top - margin.bottom;
 
@@ -186,6 +186,12 @@ export default function Home() {
     yAxisGroup.call(yAxis);
     yAxisRightGroup.call(yAxisRight);
 
+    // Style axis text
+    g.selectAll(".x-axis text, .y-axis text, .y-axis-right text")
+      .attr("fill", "#374151");
+    g.selectAll(".x-axis line, .y-axis line, .y-axis-right line, .x-axis path, .y-axis path, .y-axis-right path")
+      .attr("stroke", "#9ca3af");
+
     // Add zero line
     chartContent
       .append("line")
@@ -279,24 +285,27 @@ export default function Home() {
       .attr("x", 24)
       .attr("y", 9.5)
       .attr("dy", "0.32em")
+      .attr("fill", "#171717")
       .text((d) => d.label);
 
     // Add y-axis labels
     g.append("text")
       .attr("transform", "rotate(-90)")
-      .attr("y", -margin.left)
+      .attr("y", -60)
       .attr("x", -height / 2)
-      .attr("dy", "1em")
+      .attr("fill", "#374151")
       .style("text-anchor", "middle")
+      .style("font-size", "12px")
       .text("Value (USD)");
 
     g.append("text")
       .attr("transform", "rotate(90)")
-      .attr("y", -width - margin.right)
+      .attr("y", -width - 60)
       .attr("x", height / 2)
-      .attr("dy", "1em")
+      .attr("fill", "#374151")
       .style("text-anchor", "middle")
-      .text("Premium/Discount to BTC Holdings (%)");
+      .style("font-size", "12px")
+      .text("Premium/Discount (%)");
 
     // Create tooltip div
     const tooltip = d3
@@ -304,9 +313,12 @@ export default function Home() {
       .append("div")
       .attr(
         "class",
-        "absolute hidden bg-black/80 text-white p-2 rounded text-sm pointer-events-none whitespace-nowrap"
+        "absolute hidden p-3 rounded text-sm pointer-events-none whitespace-nowrap shadow-lg"
       )
-      .style("z-index", "100");
+      .style("z-index", "100")
+      .style("background", "#ffffff")
+      .style("color", "#171717")
+      .style("border", "1px solid #e5e7eb");
 
     // Create a vertical line for hover effect
     const verticalLine = g
@@ -398,19 +410,19 @@ export default function Home() {
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Updated navigation buttons */}
-        <div className="flex gap-4 mb-8">
+        {/* Navigation buttons */}
+        <div className="flex gap-3 mb-8">
           <a
             href="https://ze-codes.github.io/"
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="btn btn-secondary"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Back to Main Page
+            ← Back to Main Page
           </a>
           <a
             href="https://github.com/ze-codes/mstr-vs-btc"
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="btn btn-primary"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -421,14 +433,14 @@ export default function Home() {
         <h1 className="text-2xl font-bold mb-8">
           MicroStrategy: Market Cap vs BTC Holdings Value
         </h1>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+        <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200 overflow-hidden">
           <div className="text-sm text-gray-500 mb-2">
             Use mouse wheel to zoom, drag to pan
           </div>
           <svg
             ref={svgRef}
-            className="w-full h-[600px]"
-            style={{ overflow: "visible", marginBottom: "40px" }}
+            className="w-full h-[650px]"
+            style={{ overflow: "hidden" }}
           />
         </div>
       </div>
