@@ -7,15 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "fetch-data": "tsx src/scripts/fetchData.ts",
-    "deploy": "next build && touch out/.nojekyll && gh-pages -d out -t"
+    "fetch-data": "tsx src/scripts/fetchData.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "next": "16.1.1",
-    "npm-check-updates": "^19.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -25,7 +23,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "gh-pages": "^6.3.0",
     "postcss": "^8",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
