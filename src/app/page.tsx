@@ -187,10 +187,13 @@ export default function Home() {
     yAxisRightGroup.call(yAxisRight);
 
     // Style axis text
-    g.selectAll(".x-axis text, .y-axis text, .y-axis-right text")
-      .attr("fill", "#374151");
-    g.selectAll(".x-axis line, .y-axis line, .y-axis-right line, .x-axis path, .y-axis path, .y-axis-right path")
-      .attr("stroke", "#9ca3af");
+    g.selectAll(".x-axis text, .y-axis text, .y-axis-right text").attr(
+      "fill",
+      "#374151"
+    );
+    g.selectAll(
+      ".x-axis line, .y-axis line, .y-axis-right line, .x-axis path, .y-axis path, .y-axis-right path"
+    ).attr("stroke", "#9ca3af");
 
     // Add zero line
     chartContent
@@ -430,9 +433,22 @@ export default function Home() {
           </a>
         </div>
 
-        <h1 className="text-2xl font-bold mb-8">
+        <h1 className="text-2xl font-bold mb-4">
           MicroStrategy: Market Cap vs BTC Holdings Value
         </h1>
+        <p className="text-gray-600 mb-6 max-w-3xl">
+          This chart was created to support my investment thesis of shorting MSTR and longing BTC, 
+          betting that MSTR market cap&apos;s premium over its BTC holdings would go to 0.{" "}
+          <a
+            href="https://zespace.notion.site/MicroStrategy-s-Bitcoin-Accumulation-What-You-Should-Know-1435df8e68ee8051b11adb9539e8e1ca?pvs=4"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            Click here to view my original analysis
+          </a>
+          .
+        </p>
         <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200 overflow-hidden">
           <div className="text-sm text-gray-500 mb-2">
             Use mouse wheel to zoom, drag to pan
