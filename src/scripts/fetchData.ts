@@ -48,35 +48,51 @@ async function fetchData() {
     const today = new Date();
     const toDate = today.toISOString().split("T")[0];
 
-    // Fetch BTC price data
+    // Fetch BTC price data (CryptoCompare histoday has a max limit of 2000 per request)
+    const CRYPTOCOMPARE_MAX_LIMIT = 2000;
     console.log("\nFetching BTC price data...");
     const daysDiff = Math.ceil(
       (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
     );
     console.log(`Fetching ${daysDiff} days of price data...`);
 
-    const btcResponse = await fetch(
-      `https://min-api.cryptocompare.com/data/v2/histoday?` +
-        `fsym=BTC&tsym=USD&limit=${daysDiff}&toTs=${Math.floor(
-          today.getTime() / 1000
-        )}`
-    );
+    const allBtcRows: Array<{ time: number; close: number }> = [];
+    let toTs = Math.floor(today.getTime() / 1000);
+    let remaining = daysDiff;
 
-    if (!btcResponse.ok) {
-      throw new Error(`BTC HTTP error! status: ${btcResponse.status}`);
+    while (remaining > 0) {
+      const limit = Math.min(remaining, CRYPTOCOMPARE_MAX_LIMIT);
+      const btcResponse = await fetch(
+        `https://min-api.cryptocompare.com/data/v2/histoday?` +
+          `fsym=BTC&tsym=USD&limit=${limit}&toTs=${toTs}`
+      );
+
+      if (!btcResponse.ok) {
+        throw new Error(`BTC HTTP error! status: ${btcResponse.status}`);
+      }
+
+      const btcData: CryptoCompareResponse = await btcResponse.json();
+
+      if (btcData.Response !== "Success") {
+        throw new Error(`BTC API error: ${btcData.Message}`);
+      }
+
+      const data = btcData.Data.Data;
+      if (data.length === 0) break;
+
+      allBtcRows.push(...data.map((item) => ({ time: item.time, close: item.close })));
+      remaining -= data.length;
+      if (data.length < limit) break;
+      toTs = data[0].time - 1;
     }
 
-    const btcData: CryptoCompareResponse = await btcResponse.json();
-
-    if (btcData.Response !== "Success") {
-      throw new Error(`BTC API error: ${btcData.Message}`);
-    }
-
-    // Format BTC data
-    const formattedBTCData: BTCPriceData[] = btcData.Data.Data.map((item) => ({
-      date: new Date(item.time * 1000).toISOString().split("T")[0],
-      price: item.close,
-    }));
+    // Format BTC data (newest first from API, sort by date ascending)
+    const formattedBTCData: BTCPriceData[] = allBtcRows
+      .sort((a, b) => a.time - b.time)
+      .map((item) => ({
+        date: new Date(item.time * 1000).toISOString().split("T")[0],
+        price: item.close,
+      }));
 
     // Verify BTC data range
     const earliestBTCDate = formattedBTCData[0].date;
