@@ -218,13 +218,15 @@ async function fetchData() {
     // Fetch MSTR Bitcoin purchases from CoinGecko
     console.log("\nFetching MSTR Bitcoin purchases from CoinGecko...");
 
+    if (!COINGECKO_API_KEY) {
+      throw new Error(
+        "COINGECKO_API_KEY is required. Set it in .env.local (local) or GitHub secrets (CI)."
+      );
+    }
+
     let formattedPurchases: BTCPurchase[] = [];
 
-    if (!COINGECKO_API_KEY) {
-      console.warn(
-        "Warning: COINGECKO_API_KEY not set. Skipping purchase data fetch."
-      );
-    } else {
+    {
       // First, find MicroStrategy's entity ID from the entities list
       console.log("Fetching entities list...");
       const entitiesResponse = await fetch(
@@ -321,21 +323,12 @@ async function fetchData() {
     const mstrFilePath = path.join(dataDir, "marketCap.json");
     const purchasesFilePath = path.join(dataDir, "btcPurchases.json");
 
-    const filesToWrite = [
+    // Save all datasets
+    await Promise.all([
       fs.writeFile(btcFilePath, JSON.stringify(formattedBTCData, null, 2)),
       fs.writeFile(mstrFilePath, JSON.stringify(formattedMSTRData, null, 2)),
-    ];
-
-    if (formattedPurchases.length > 0) {
-      filesToWrite.push(
-        fs.writeFile(
-          purchasesFilePath,
-          JSON.stringify(formattedPurchases, null, 2)
-        )
-      );
-    }
-
-    await Promise.all(filesToWrite);
+      fs.writeFile(purchasesFilePath, JSON.stringify(formattedPurchases, null, 2)),
+    ]);
 
     console.log("\nData fetch completed successfully!");
     console.log(`BTC Prices: ${formattedBTCData.length} records`);
