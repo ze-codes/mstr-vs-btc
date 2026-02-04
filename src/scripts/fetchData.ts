@@ -1,6 +1,52 @@
 import fs from "fs/promises";
+import { readFileSync, existsSync } from "fs";
 import path from "path";
-import { BTCPriceData, MarketCapData } from "@/types";
+import { BTCPriceData, MarketCapData, BTCPurchase } from "@/types";
+
+// Load .env.local if it exists (for local development)
+const envPath = path.join(process.cwd(), ".env.local");
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const [key, ...valueParts] = trimmed.split("=");
+      const value = valueParts.join("=");
+      if (key && value && !process.env[key]) {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
+// CoinGecko API configuration
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
+const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
+
+interface CoinGeckoEntity {
+  id: string;
+  symbol: string;
+  name: string;
+  country: string;
+}
+
+interface CoinGeckoTransaction {
+  date: number; // Unix timestamp in milliseconds
+  type: string; // "buy" or "sell"
+  holding_net_change: number; // BTC amount
+  transaction_value_usd: number; // Total cost in USD
+  average_entry_value_usd: number; // Price per BTC
+  coin_id: string;
+  source_url: string;
+  holding_balance: number;
+}
+
+interface CoinGeckoTransactionResponse {
+  id: string;
+  name: string;
+  symbol: string;
+  transactions: CoinGeckoTransaction[];
+}
 
 interface CryptoCompareResponse {
   Response: string;
@@ -169,18 +215,127 @@ async function fetchData() {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
+    // Fetch MSTR Bitcoin purchases from CoinGecko
+    console.log("\nFetching MSTR Bitcoin purchases from CoinGecko...");
+
+    let formattedPurchases: BTCPurchase[] = [];
+
+    if (!COINGECKO_API_KEY) {
+      console.warn(
+        "Warning: COINGECKO_API_KEY not set. Skipping purchase data fetch."
+      );
+    } else {
+      // First, find MicroStrategy's entity ID from the entities list
+      console.log("Fetching entities list...");
+      const entitiesResponse = await fetch(
+        `${COINGECKO_BASE_URL}/entities/list?per_page=250`,
+        {
+          headers: {
+            "x-cg-demo-api-key": COINGECKO_API_KEY,
+          },
+        }
+      );
+
+      if (!entitiesResponse.ok) {
+        console.warn(
+          `Warning: Failed to fetch entities list (${entitiesResponse.status}). Trying direct lookup...`
+        );
+      }
+
+      let mstrEntityId: string | null = null;
+
+      if (entitiesResponse.ok) {
+        const entities: CoinGeckoEntity[] = await entitiesResponse.json();
+        // Look for MicroStrategy/Strategy in the entities list
+        const mstrEntity = entities.find(
+          (e) =>
+            (e.name && e.name.toLowerCase().includes("microstrategy")) ||
+            (e.name && e.name.toLowerCase().includes("strategy")) ||
+            (e.symbol && e.symbol.toLowerCase().includes("mstr"))
+        );
+
+        if (mstrEntity) {
+          mstrEntityId = mstrEntity.id;
+          console.log(
+            `Found MicroStrategy entity: ${mstrEntity.name} (${mstrEntityId})`
+          );
+        } else {
+          const entityNames = entities
+            .filter((e) => e.name)
+            .map((e) => `${e.name} (${e.id})`)
+            .slice(0, 20);
+          console.log("Sample entities:", entityNames.join(", "));
+          console.warn("MicroStrategy not found in entities list.");
+        }
+      }
+
+      // Try to fetch transaction history if we have an entity ID
+      if (mstrEntityId) {
+        const purchaseResponse = await fetch(
+          `${COINGECKO_BASE_URL}/public_treasury/${mstrEntityId}/transaction_history`,
+          {
+            headers: {
+              "x-cg-demo-api-key": COINGECKO_API_KEY,
+            },
+          }
+        );
+
+        if (!purchaseResponse.ok) {
+          const errorText = await purchaseResponse.text();
+          console.warn(
+            `Warning: CoinGecko API returned ${purchaseResponse.status}. ${errorText}`
+          );
+        } else {
+          const purchaseData = await purchaseResponse.json();
+          console.log("API Response:", JSON.stringify(purchaseData, null, 2).slice(0, 500));
+
+          // Handle different response structures
+          const transactions: CoinGeckoTransaction[] = purchaseData.transactions || purchaseData.data || [];
+          
+          if (Array.isArray(transactions) && transactions.length > 0) {
+            // Filter for "buy" transactions and format the data
+            formattedPurchases = transactions
+              .filter((tx) => tx.type === "buy")
+              .map((tx) => ({
+                date: new Date(tx.date).toISOString().split("T")[0],
+                averagePrice: tx.average_entry_value_usd,
+                amount: tx.holding_net_change,
+                cost: tx.transaction_value_usd,
+              }))
+              .sort(
+                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+              );
+          }
+
+          console.log(`Fetched ${formattedPurchases.length} purchase records`);
+        }
+      }
+    }
+
     // Create data directory if it doesn't exist
     const dataDir = path.join(process.cwd(), "src/data");
     await fs.mkdir(dataDir, { recursive: true });
 
-    // Save both datasets
+    // Save all datasets
     const btcFilePath = path.join(dataDir, "btcPrices.json");
     const mstrFilePath = path.join(dataDir, "marketCap.json");
+    const purchasesFilePath = path.join(dataDir, "btcPurchases.json");
 
-    await Promise.all([
+    const filesToWrite = [
       fs.writeFile(btcFilePath, JSON.stringify(formattedBTCData, null, 2)),
       fs.writeFile(mstrFilePath, JSON.stringify(formattedMSTRData, null, 2)),
-    ]);
+    ];
+
+    if (formattedPurchases.length > 0) {
+      filesToWrite.push(
+        fs.writeFile(
+          purchasesFilePath,
+          JSON.stringify(formattedPurchases, null, 2)
+        )
+      );
+    }
+
+    await Promise.all(filesToWrite);
 
     console.log("\nData fetch completed successfully!");
     console.log(`BTC Prices: ${formattedBTCData.length} records`);
@@ -195,6 +350,9 @@ async function fetchData() {
         formattedMSTRData[formattedMSTRData.length - 1].date
       }`
     );
+    if (formattedPurchases.length > 0) {
+      console.log(`\nMSTR BTC Purchases: ${formattedPurchases.length} records`);
+    }
   } catch (error) {
     console.error("\nFailed to fetch data:", error);
     process.exit(1);

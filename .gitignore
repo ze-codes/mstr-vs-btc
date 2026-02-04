@@ -40,5 +40,4 @@ yarn-error.log*
 next-env.d.ts
 
 # generated data (fetched at build time)
-/src/data/btcPrices.json
-/src/data/marketCap.json
+/src/data/
